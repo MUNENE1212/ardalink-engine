@@ -30,6 +30,9 @@ dev = [
     "types-requests>=2.32.0",
     "pre-commit>=4.0.0",
 ]
+test = [
+    "testcontainers[postgres]>=4.8.0",
+]
 
 [project.scripts]
 ardalink-engine = "ardalink_engine.main:run"

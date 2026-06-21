@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Added
+- Phase 2: Multi-tenant data model
+  - `migrations/0001_multitenant.up.sql` + `.down.sql` — adds `tenant_id` to every `gis_engine` table, creates `tenants` registry, enables RLS
+  - `ardalink_engine/tenancy.py` — `set_tenant()` context manager and HMAC-SHA256 attestation helpers
+  - `tests/test_tenancy.py` — unit tests for tenant binding and attestation
+  - `TENANT_ATTESTATION_SECRET` env var documented in `.env.example`
+  - `testcontainers[postgres]` added as dev dependency for future integration tests
+
+### Added
 - Initial scaffold from CTO restructure (Phase 1, 2026-06-21)
 - 8-doc CTO navigation under `docs/`
 - Ruff + mypy + pytest CI gating

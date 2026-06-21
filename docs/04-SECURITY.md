@@ -7,9 +7,17 @@
 | Surface | Threat | Control |
 |---|---|---|
 | Earth Engine credentials | Quota theft, account compromise | Service account, restricted IAM |
-| Postgres `gis_engine` schema | Data leak across tenants | Row-level security (Phase 2) |
+| Postgres `gis_engine` schema | Cross-tenant data leak | Row-Level Security (v0.2.0) |
+| Tenant id spoofing | Upstream bug allows caller to choose tenant | HMAC-SHA256 attestation header |
 | Azure OpenAI key | Token theft | Cloud secret manager (Phase 8) |
 | Voice transcripts in logs | PII exposure | Redaction middleware (Phase 8) |
+
+## Multi-tenant isolation (v0.2.0)
+
+Every query on this service is bound to a tenant via `ardalink_engine.tenancy.set_tenant()`.
+Postgres RLS policies (see `migrations/0001_multitenant.up.sql`) reject any row whose
+`tenant_id` does not match the session variable. The `TENANT_ATTESTATION_SECRET` env var
+gates this in production — never run with an empty value.
 
 ## Secrets
 
