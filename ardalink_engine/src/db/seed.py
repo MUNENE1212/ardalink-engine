@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from ..geo.wards import WARDS, WARD_NAMES, haversine_km
+from ..geo.wards import WARD_NAMES, WARDS, haversine_km
 from ..logging_config import get_logger
 from .client import DatabaseClient
 

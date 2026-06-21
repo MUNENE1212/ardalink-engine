@@ -30,7 +30,7 @@ import asyncio
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..config import settings
 from ..logging_config import get_logger
@@ -107,7 +107,7 @@ _cycle_lock = asyncio.Lock()
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _layer_meta() -> dict[str, dict]:
@@ -130,7 +130,7 @@ def _grid_cell_count() -> int:
 
 def _local_hour() -> float:
     """Current hour-of-day in the configured local timezone (UTC + offset)."""
-    utc_hour = datetime.now(timezone.utc).hour + datetime.now(timezone.utc).minute / 60.0
+    utc_hour = datetime.now(UTC).hour + datetime.now(UTC).minute / 60.0
     return (utc_hour + settings.INGEST_LOCAL_UTC_OFFSET_HOURS) % 24.0
 
 
@@ -164,7 +164,7 @@ def _envelope_month_stale() -> bool:
     if not gm:
         return False
     stored = gm.get("ndvi_envelope_month")
-    return stored is None or int(stored) != datetime.now(timezone.utc).month
+    return stored is None or int(stored) != datetime.now(UTC).month
 
 
 def _due_reason(job: _LayerJob, meta: dict[str, dict], cell_count: int) -> str | None:
@@ -181,7 +181,7 @@ def _due_reason(job: _LayerJob, meta: dict[str, dict], cell_count: int) -> str |
     written = row.get("cells_written") or 0
     if cell_count > 0 and written < settings.INGEST_MIN_COVERAGE_FRACTION * cell_count:
         return f"under_covered ({written}/{cell_count} cells)"
-    age_hours = (datetime.now(timezone.utc) - row["updated_at"]).total_seconds() / 3600.0
+    age_hours = (datetime.now(UTC) - row["updated_at"]).total_seconds() / 3600.0
     if age_hours >= job.interval_hours:
         return f"stale ({age_hours:.1f}h ≥ {job.interval_hours:.0f}h)"
     # Static carries the month-matched NDVI envelope: refresh it when the
@@ -408,7 +408,7 @@ def status() -> dict:
             next_due_iso = None
             if last_ingest is not None:
                 next_due = last_ingest.timestamp() + st.interval_hours * 3600.0
-                next_due_iso = datetime.fromtimestamp(next_due, tz=timezone.utc).isoformat()
+                next_due_iso = datetime.fromtimestamp(next_due, tz=UTC).isoformat()
             job = plan.get(name)
             reason = _due_reason(job, meta, cell_count) if job is not None else None
             layers_out[name] = {

@@ -9,7 +9,8 @@ contained within ``gis_engine``.
 from __future__ import annotations
 
 import contextlib
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import psycopg2
 import psycopg2.extras
@@ -56,9 +57,8 @@ class DatabaseClient:
 
     def ensure_schema(self) -> None:
         """Create the dedicated schema if it does not already exist."""
-        with self.connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(f'CREATE SCHEMA IF NOT EXISTS "{self.schema}"')
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(f'CREATE SCHEMA IF NOT EXISTS "{self.schema}"')
         logger.info("Ensured schema '%s' exists", self.schema)
 
     def fetch_one(self, sql: str, params: tuple[Any, ...] | None = None) -> dict[str, Any] | None:
@@ -73,9 +73,8 @@ class DatabaseClient:
             return [dict(r) for r in cur.fetchall()]
 
     def execute(self, sql: str, params: tuple[Any, ...] | None = None) -> None:
-        with self.connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(sql, params)
+        with self.connection() as conn, conn.cursor() as cur:
+            cur.execute(sql, params)
 
 
 db_client = DatabaseClient()

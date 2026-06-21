@@ -138,8 +138,7 @@ def _ddl(schema: str) -> list[str]:
 def create_tables(client: DatabaseClient) -> None:
     """Create all engine tables and indexes (idempotent)."""
     client.ensure_schema()
-    with client.connection() as conn:
-        with conn.cursor() as cur:
-            for statement in _ddl(client.schema):
-                cur.execute(statement)
+    with client.connection() as conn, conn.cursor() as cur:
+        for statement in _ddl(client.schema):
+            cur.execute(statement)
     logger.info("Engine tables ensured in schema '%s'", client.schema)

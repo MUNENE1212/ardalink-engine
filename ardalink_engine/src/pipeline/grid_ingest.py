@@ -27,8 +27,8 @@ and simply has no row in ``grid_layer_meta``; callers report it as unavailable.
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
-from typing import Callable, Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
 import psycopg2.extras
 
@@ -96,10 +96,9 @@ def build_grid(resolution_m: float | None = None) -> dict:
         "Building grid: %d x %d = %d cells at %.1f m (%.6f deg)",
         spec.nrows, spec.ncols, spec.cell_count, res_m, spec.resolution_deg,
     )
-    with db_client.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                f'''
+    with db_client.connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            f'''
                 INSERT INTO "{schema}".grid_cells
                     (cell_id, row_idx, col_idx, latitude, longitude)
                 SELECT r * %(ncols)s + c, r, c,
@@ -109,23 +108,23 @@ def build_grid(resolution_m: float | None = None) -> dict:
                      generate_series(0, %(ncols)s - 1) AS c
                 ON CONFLICT (cell_id) DO NOTHING
                 ''',
-                {
-                    "ncols": spec.ncols,
-                    "nrows": spec.nrows,
-                    "south": spec.south,
-                    "west": spec.west,
-                    "res": spec.resolution_deg,
-                },
-            )
-            cur.execute(
-                f'''
+            {
+                "ncols": spec.ncols,
+                "nrows": spec.nrows,
+                "south": spec.south,
+                "west": spec.west,
+                "res": spec.resolution_deg,
+            },
+        )
+        cur.execute(
+            f'''
                 INSERT INTO "{schema}".grid_dynamic (cell_id)
                 SELECT cell_id FROM "{schema}".grid_cells
                 ON CONFLICT (cell_id) DO NOTHING
                 '''
-            )
-            cur.execute(
-                f'''
+        )
+        cur.execute(
+            f'''
                 INSERT INTO "{schema}".grid_meta
                     (id, resolution_deg, resolution_m, south, west, north, east,
                      nrows, ncols, cell_count, built_at)
@@ -138,11 +137,11 @@ def build_grid(resolution_m: float | None = None) -> dict:
                     nrows = EXCLUDED.nrows, ncols = EXCLUDED.ncols,
                     cell_count = EXCLUDED.cell_count, built_at = now()
                 ''',
-                (
-                    spec.resolution_deg, res_m, spec.south, spec.west,
-                    spec.north, spec.east, spec.nrows, spec.ncols, spec.cell_count,
-                ),
-            )
+            (
+                spec.resolution_deg, res_m, spec.south, spec.west,
+                spec.north, spec.east, spec.nrows, spec.ncols, spec.cell_count,
+            ),
+        )
     logger.info("Grid build complete: %d cells", spec.cell_count)
     return {
         "cells": spec.cell_count,
@@ -156,11 +155,10 @@ def build_grid(resolution_m: float | None = None) -> dict:
 def reset_grid() -> None:
     """Drop all grid rows (used before rebuilding at a different resolution)."""
     schema = db_client.schema
-    with db_client.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(f'TRUNCATE "{schema}".grid_dynamic, "{schema}".grid_cells')
-            cur.execute(f'DELETE FROM "{schema}".grid_meta')
-            cur.execute(f'DELETE FROM "{schema}".grid_layer_meta')
+    with db_client.connection() as conn, conn.cursor() as cur:
+        cur.execute(f'TRUNCATE "{schema}".grid_dynamic, "{schema}".grid_cells')
+        cur.execute(f'DELETE FROM "{schema}".grid_meta')
+        cur.execute(f'DELETE FROM "{schema}".grid_layer_meta')
 
 
 def get_grid_meta() -> dict | None:
@@ -288,26 +286,24 @@ def _bulk_update(table: str, columns: list[str], rows: list[tuple]) -> int:
         f'FROM (VALUES %s) AS v ({col_list}) '
         f'WHERE t.cell_id = v.cell_id'
     )
-    with db_client.connection() as conn:
-        with conn.cursor() as cur:
-            psycopg2.extras.execute_values(cur, sql, rows)
+    with db_client.connection() as conn, conn.cursor() as cur:
+        psycopg2.extras.execute_values(cur, sql, rows)
     return len(rows)
 
 
 def _record_layer(layer: str, source: str, cells_written: int) -> None:
     schema = db_client.schema
-    with db_client.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                f'''INSERT INTO "{schema}".grid_layer_meta
+    with db_client.connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            f'''INSERT INTO "{schema}".grid_layer_meta
                         (layer, source, updated_at, cells_written)
                     VALUES (%s, %s, now(), %s)
                     ON CONFLICT (layer) DO UPDATE SET
                         source = EXCLUDED.source,
                         updated_at = now(),
                         cells_written = EXCLUDED.cells_written''',
-                (layer, source, cells_written),
-            )
+            (layer, source, cells_written),
+        )
 
 
 # --------------------------------------------------------------------------
@@ -337,7 +333,7 @@ def ingest_static(bbox: tuple[float, float, float, float] | None = None) -> dict
     # textbook VCI definition — is this March drier than a typical March — and it
     # also makes the reduction ~12x lighter. Persisted once here; VCI refreshes
     # reuse it (see _current_ndvi_image / the vegetation branch of ingest_layer).
-    envelope_month = datetime.now(timezone.utc).month
+    envelope_month = datetime.now(UTC).month
     ndvi = (
         ee.ImageCollection(MODIS_NDVI_PRODUCT)
         .select(MODIS_NDVI_BAND)
@@ -397,12 +393,11 @@ def ingest_static(bbox: tuple[float, float, float, float] | None = None) -> dict
 def _set_envelope_month(month: int) -> None:
     """Persist the calendar month the stored seasonal NDVI envelope represents."""
     schema = db_client.schema
-    with db_client.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                f'UPDATE "{schema}".grid_meta SET ndvi_envelope_month = %s WHERE id = 1',
-                (month,),
-            )
+    with db_client.connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            f'UPDATE "{schema}".grid_meta SET ndvi_envelope_month = %s WHERE id = 1',
+            (month,),
+        )
 
 
 def _bulk_update_static(rows: list[tuple]) -> int:
@@ -419,9 +414,8 @@ def _bulk_update_static(rows: list[tuple]) -> int:
         f'(cell_id, elevation_m, slope_deg, ndvi_min, ndvi_max, ndvi_mean, urban_fraction, ts) '
         f'WHERE t.cell_id = v.cell_id'
     )
-    with db_client.connection() as conn:
-        with conn.cursor() as cur:
-            psycopg2.extras.execute_values(cur, sql, rows)
+    with db_client.connection() as conn, conn.cursor() as cur:
+        psycopg2.extras.execute_values(cur, sql, rows)
     return len(rows)
 
 
