@@ -1,0 +1,15 @@
+# ArdaLink Biophysical Data Engine — Python 3.11
+# Core web framework
+fastapi
+uvicorn[standard]
+
+# Geospatial / environmental stack
+earthengine-api   # imported as `ee` — Google Earth Engine Python API
+geopandas
+networkx
+
+# Database connectivity
+psycopg2-binary
+
+# Lightweight HTTP client (Azure OpenAI calls)
+requests
